@@ -1,20 +1,109 @@
-# Reproducible Research: Peer Assessment 1
+Analysis on exercise activity collected from activity monitoring devices
+========================================================================
+
+This analysis makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+First step is to read in the raw data into R. 
+
+```{r}
+setwd("C:/Users/David/Dropbox/Coursera/Reproducible Research/Peer Assessment 1")
+activity<- read.csv("./repdata_data_activity/activity.csv", colClasses=c("integer","Date","integer"))
+```
+
+Do a quick sample to check that it's been read in OK.
+```{r}
+head(activity)
+```
+
+Below is a histogram of the no of steps taken each day.
+
+```{r fig.width=7, fig.height=6}
+total.steps.per.day<- tapply(activity$steps, activity$date, sum)
+hist(total.steps.per.day, breaks=10, main="Histogram of no of steps taken each day")
+```
+
+Find the mean and median no of steps taken per day.
+```{r}
+mean.steps.per.day<- mean(total.steps.per.day,na.rm=TRUE)
+median.steps.per.day<- median(total.steps.per.day,na.rm=TRUE)
+mean.steps.per.day
+median.steps.per.day
+```
+
+The 5 min interval (hhmm) with the greatest no of steps averaged across each day is 8:35am.
+```{r}
+mean.steps.per.interval<- tapply(activity$steps,activity$interval,mean,na.rm=TRUE)
+max.interval<- names(which.max(mean.steps.per.interval))
+max.interval
+```
+
+Here is a time series plot of the average number of steps taken in each interval, averaged across all days.
+```{r}
+plot(names(mean.steps.per.interval),mean.steps.per.interval,type="l",xlab="Time of Day (hhmm)",ylab="Mean no of steps")
+```
+
+The no of rows with missing (NA) no of steps taken is:
+```{r}
+num.missing<- sum(is.na(activity$steps))
+num.missing
+```
+
+To get around this issue, we will impute the missing values with the mean no of steps taken in each 5 min interval across all days. Lets create another data frame (activity.no.missing) which we will use to impute the missing values back into the activity data frame.
+
+```{r}
+# Calculate the mean no of steps per 5 min interval
+mean.steps.per.interval<- tapply(activity$steps,activity$interval,mean,na.rm=TRUE)
+# Merge these mean values back into the data.
+activity.no.missing<- merge(activity,cbind(mean.steps.per.interval,row=row.names(mean.steps.per.interval)),by.x="interval",by.y="row",all.x=TRUE)
+# Convert the mean values from factors values back into numeric values,
+activity.no.missing$mean.steps.per.interval<- as.numeric(as.character(activity.no.missing$mean.steps.per.interval))
+# Merge back the mean values only for intervals where the no of steps is missing (NA)
+activity$steps[is.na(activity$steps)]<- activity.no.missing$mean.steps.per.interval[is.na(activity$steps)]
+```
 
 
-## Loading and preprocessing the data
 
+Now lets see again the histogram of the total no of steps per day and also recalculate again the mean and median no of steps per day.
 
+```{r}
+total.steps.per.day<- tapply(activity$steps, activity$date, sum)
+hist(total.steps.per.day, breaks=10, main="Histogram of no of steps taken each day")
+```
 
-## What is mean total number of steps taken per day?
+```{r}
+mean.steps.per.day<- mean(total.steps.per.day,na.rm=TRUE)
+median.steps.per.day<- median(total.steps.per.day,na.rm=TRUE)
+mean.steps.per.day
+median.steps.per.day
+```
 
+As can be seen, the mean and median no of steps has increased slightly after imputing the missing values.
 
+Let's now turn our attention to focusing on the weekday and weekend split of the mean no of steps taken per 5 min interval.
 
-## What is the average daily activity pattern?
+The next few lines of code create a factor variable using the weekday function and manipulate the data frame into a nice format for graphing.
 
+```{r}
+activity$wday<-weekdays(activity$date)
+activity$day.type<- factor(ifelse((activity$wday =="Saturday" | activity$wday =="Sunday"),"weekend","weekday"))
 
+activity<- activity[order(activity$date,activity$interval),]
+mean.steps.per.interval.per.day.type<- tapply(activity$steps,list(activity$day.type,activity$interval),mean,na.rm=TRUE)
+mean.steps.per.interval.per.day.type2<- t(mean.steps.per.interval.per.day.type)
+mean.steps.per.interval.per.day.type3<- as.data.frame(mean.steps.per.interval.per.day.type2)
+mean.steps.per.interval.per.day.type3$interval<- row.names(mean.steps.per.interval.per.day.type3)
+```
 
-## Imputing missing values
+Lets have a quick peek at what the final data now looks like
 
+```{r}
+head(mean.steps.per.interval.per.day.type3)
+```
 
+We can now see that more activity steps are done at the weekend.
+```{r}
+par(mfcol=c(2,1))
+plot(mean.steps.per.interval.per.day.type3$interval,mean.steps.per.interval.per.day.type3$weekday,type="l",xlab="Time of Day (hhmm)",ylab="No of steps",main="Weekdays")
+plot(mean.steps.per.interval.per.day.type3$interval,mean.steps.per.interval.per.day.type3$weekend,type="l",xlab="Time of Day (hhmm)",ylab="No of steps",main="Weekends")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
